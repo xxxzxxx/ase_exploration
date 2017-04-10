@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<launch>
+	<rosparam command="delete" ns="move_base" />
+	<include file="$(find turtlebot_bringup)/launch/3dsensor.launch">
+		<arg name="rgb_processing" value="true" />
+		<arg name="depth_registration" value="true" />
+		<arg name="depth_processing" value="true" />
+	</include>
+	<node name="hokuyo_urg_node" pkg="urg_node" type="urg_node">
+		<param name="ip_address" value="192.168.3.10" />
+		<param name="ip_port" value="10940" />
+		<param name="frame_id" value="base_laser_link"/>
+		<param name="calibrate_time" type="bool" value="true"/>
+		<param name="intensity" type="bool" value="true"/>
+		<param name="cluster" value="1"/>
+		<remap from="hokuyo/scan" to="scan"/>
+	</node>
+	<!-- SLAM for global map and map->base_link tf -->
+
+	<!--
+	<node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
+		<param name="xmin" value="-1.0"/>
+		<param name="xmax" value="1.0"/>
+		<param name="ymin" value="-1.0"/>
+		<param name="ymax" value="1.0"/>
+	</node>
+
+	<node pkg="explore_lite" type="explore" respawn="true" name="explore" output="screen">
+		<param name="robot_base_frame" value="base_footprint"/>
+		<param name="costmap_topic" value="map"/>
+		<param name="costmap_updates_topic" value="move_base/global_costmap/costmap_updates"/>
+		<param name="visualize" value="true"/>
+		<param name="planner_frequency" value="0.1"/>
+		<param name="progress_timeout" value="10.0"/>
+		<param name="potential_scale" value="0.005"/>
+		<param name="orientation_scale" value="0.1"/>
+		<param name="gain_scale" value="1.0"/>
+		<param name="transform_tolerance" value="0.3"/>
+	</node>
+		-->
+
+	<node pkg="slam_karto" type="slam_karto" name="slam_karto" output="screen" />
+
+	<!-- Frontier exploration used as fallback solution -->
+	<node pkg="frontier_exploration" type="explore_server" name="frontier_exploration" output="screen">
+	    <rosparam file="$(find ase_exploration)/param/frontier_exploration.yaml" command="load" ns="explore_costmap"/>
+	</node>
+
+	<!-- ase_exploration_node -->
+	<node pkg="ase_exploration" type="ase_exploration_planner_node" name="ase_exploration_planner_node" output="screen">
+		<!-- Subscribed topics -->
+		<remap from="map" to="map"/>
+		<remap from="costmap" to="move_base/global_costmap/costmap"/>
+		<remap from="costmap_updates" to="move_base/global_costmap/costmap_updates"/>
+
+		<!-- Action where move_base may be found -->
+		<remap from="move_base" to="move_base"/>
+
+		<!-- Published topics -->
+		<remap from="planner_paths" to="planner_paths"/>
+
+		<!-- Frontier exploration services -->
+		<remap from="frontier_exploration/explore_costmap/explore_boundary/update_boundary_polygon" 
+			to="frontier_exploration/explore_costmap/explore_boundary/update_boundary_polygon"/>
+ 		<remap from="frontier_exploration/explore_costmap/explore_boundary/get_next_frontier" 
+			to="frontier_exploration/explore_costmap/explore_boundary/get_next_frontier"/>
+
+		<!-- Read all parameters -->
+		<rosparam file="$(find ase_exploration)/param/planner.yaml" command="load"/>
+	</node>
+
+	<include file="$(find logiler_explore)/launch/includes/move_base.launch.xml" />
+
+	<!--  **************** Visualisation ****************  -->
+	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find ase_exploration)/rviz/simulator_exploration.rviz"/>
+</launch>
